@@ -1,7 +1,5 @@
-# Youtube-Analyzer
 # 📊 YouTube Analyse Tool
 
-My first Vibe Coding project 🚀  
 A simple YouTube analytics tool that helps creators understand and improve their channel performance using real data.
 
 ---
@@ -21,6 +19,17 @@ The goal is to make analytics simple and actionable.
 
 ---
 
+## 🌍 Repository
+
+GitHub Repository:  
+git@github.com:ElyassShinwari/Youtube-Analyzer.git
+
+HTTPS Version (recommended):
+
+https://github.com/ElyassShinwari/Youtube-Analyzer
+
+---
+
 ## ✨ Features
 
 - 📈 Video statistics analysis  
@@ -37,7 +46,7 @@ The goal is to make analytics simple and actionable.
 - YouTube Data API v3  
 - Pandas  
 - Requests  
-- Matplotlib (for visualizations)
+- Matplotlib  
 
 ---
 
@@ -55,5 +64,67 @@ The goal is to make analytics simple and actionable.
 Clone the repository:
 
 ```bash
-git@github.com:ElyassShinwari/Youtube-Analyzer.git
-cd youtube-analyse
+git clone https://github.com/ElyassShinwari/Youtube-Analyzer.git
+cd Youtube-Analyzer
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## 🔑 Setup
+
+Create a `.env` file in the root directory and add your YouTube API key:
+
+```
+YOUTUBE_API_KEY=your_api_key_here
+```
+
+---
+
+## ▶️ Usage
+
+Run the project:
+
+```bash
+python main.py
+```
+
+Enter a video URL or channel ID when prompted.
+
+---
+
+## 📊 Example Metrics Calculated
+
+- Engagement Rate = (Likes + Comments) / Views  
+- Like-to-View Ratio  
+- Comment-to-View Ratio  
+- Top Performing Videos  
+
+---
+
+## 🎯 Future Improvements
+
+- 📈 Channel growth prediction  
+- 🤖 AI-powered title optimization  
+- 🖼️ Thumbnail performance insights  
+- 📤 Export analytics to PDF  
+- 🌐 Web dashboard version  
+
+---
+
+## 🤝 Contributing
+
+Feedback and improvements are welcome!
+
+Fork the repo and submit a pull request 🚀
+
+---
+
+## ⭐ Support
+
+If you like this project, consider giving it a star on GitHub!
