@@ -1,0 +1,13 @@
+[Unit]
+Description=YouTube Channel Analyzer
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/yt-analyzer/.venv/bin/python %h/.local/share/yt-analyzer/app.py --port 5731
+WorkingDirectory=%h/.local/share/yt-analyzer
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

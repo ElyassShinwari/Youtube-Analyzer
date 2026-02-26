@@ -1,0 +1,8 @@
+google-api-python-client==2.142.0
+python-dotenv==1.0.1
+rich>=13.0.0
+flask>=3.0.0
+pywebview>=4.0.0
+APScheduler>=3.10.0
+weasyprint>=60.0
+requests>=2.31.0

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Report — {{ data.name }}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #fff; color: #111; padding: 40px; font-size: 14px; }
+    @media print {
+      .no-print { display: none !important; }
+      body { padding: 20px; }
+      a { color: inherit; text-decoration: none; }
+    }
+    .no-print {
+      position: fixed; top: 20px; right: 20px;
+      display: flex; gap: 10px;
+    }
+    .no-print button {
+      padding: 10px 20px; border-radius: 8px; border: none;
+      font-family: inherit; font-size: .9rem; font-weight: 600; cursor: pointer;
+    }
+    .btn-print  { background: #ff0000; color: #fff; }
+    .btn-close  { background: #eee; color: #333; }
+
+    header { display: flex; align-items: center; gap: 20px; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 2px solid #f0f0f0; }
+    header img { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; }
+    header h1  { font-size: 1.8rem; font-weight: 800; color: #111; margin-bottom: 4px; }
+    header p   { color: #888; font-size: .85rem; }
+
+    h2 { font-size: 1rem; font-weight: 700; color: #111; margin: 28px 0 12px; border-left: 3px solid #ff0000; padding-left: 10px; }
+
+    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #f0f0f0; }
+    th { background: #f8f8f8; font-weight: 600; color: #555; font-size: .8rem; text-transform: uppercase; letter-spacing: .5px; }
+    td { color: #222; }
+    tr:last-child td { border-bottom: none; }
+    td.num { font-weight: 700; }
+    td.red  { color: #ff0000; font-weight: 700; }
+
+    .metrics-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 28px; }
+    .metric-box { background: #f8f8f8; border-radius: 10px; padding: 16px; }
+    .metric-box .val { font-size: 1.5rem; font-weight: 800; color: #ff0000; }
+    .metric-box .lbl { font-size: .72rem; color: #888; text-transform: uppercase; letter-spacing: .5px; margin-top: 4px; }
+
+    .viral-badge { background: #ff0000; color: #fff; font-size: .7rem; font-weight: 700; padding: 2px 7px; border-radius: 4px; }
+
+    footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #f0f0f0; color: #aaa; font-size: .78rem; }
+  </style>
+</head>
+<body>
+
+<div class="no-print">
+  <button class="btn-print" onclick="window.print()">🖨 Print / Save PDF</button>
+  <button class="btn-close" onclick="window.close()">✕ Close</button>
+</div>
+
+<header>
+  {% if data.thumbnail_url %}
+  <img src="{{ data.thumbnail_url }}" alt="{{ data.name }}"/>
+  {% endif %}
+  <div>
+    <h1>{{ data.name }}</h1>
+    <p>📅 Created {{ data.created_at }} &nbsp;·&nbsp; 🌍 {{ data.country }}</p>
+    <p style="margin-top:4px;color:#aaa">Report generated: {{ generated_at }} &nbsp;·&nbsp; Based on {{ data.fetched_count }} videos</p>
+  </div>
+</header>
+
+<h2>Key Metrics</h2>
+<div class="metrics-grid">
+  <div class="metric-box"><div class="val">{{ data.subscribers }}</div><div class="lbl">Subscribers</div></div>
+  <div class="metric-box"><div class="val">{{ data.total_views }}</div><div class="lbl">Total Views</div></div>
+  <div class="metric-box"><div class="val">{{ data.avg_views }}</div><div class="lbl">Avg Views/Video</div></div>
+  <div class="metric-box"><div class="val">{{ data.eng_rate }}</div><div class="lbl">Engagement Rate</div></div>
+  <div class="metric-box"><div class="val">{{ data.video_count }}</div><div class="lbl">Videos Published</div></div>
+  <div class="metric-box"><div class="val">{{ data.avg_likes }}</div><div class="lbl">Avg Likes/Video</div></div>
+  <div class="metric-box"><div class="val">{{ data.upload_freq }}</div><div class="lbl">Upload Frequency</div></div>
+  <div class="metric-box">
+    <div class="val">{% if data.upload_consistency %}{{ data.upload_consistency }}d{% else %}N/A{% endif %}</div>
+    <div class="lbl">Upload Consistency (σ)</div>
+  </div>
+</div>
+
+{% if data.extended %}
+<h2>Content Breakdown</h2>
+<table>
+  <tr><th>Type</th><th>Count</th><th>Avg Views</th></tr>
+  <tr><td>Shorts (≤60s)</td><td class="num">{{ data.extended.shorts_count }}</td><td class="num">{{ "{:,}".format(data.extended.shorts_avg_views) }}</td></tr>
+  <tr><td>Long-form (&gt;60s)</td><td class="num">{{ data.extended.long_count }}</td><td class="num">{{ "{:,}".format(data.extended.long_avg_views) }}</td></tr>
+</table>
+
+<h2>Best Days to Post</h2>
+<table>
+  <tr><th>Day</th><th>Avg Views</th></tr>
+  {% for day, avg in data.extended.day_stats.items() %}
+  <tr><td>{{ day }}</td><td class="num">{{ "{:,}".format(avg) }}</td></tr>
+  {% endfor %}
+</table>
+
+{% if data.extended.viral_videos %}
+<h2>Viral Videos (3× Channel Average)</h2>
+<table>
+  <tr><th>#</th><th>Title</th><th>Published</th><th>Views</th><th>Viral Score</th></tr>
+  {% for v in data.extended.viral_videos[:10] %}
+  <tr>
+    <td>{{ loop.index }}</td>
+    <td><a href="{{ v.url }}">{{ v.title[:70] }}</a></td>
+    <td>{{ v.published }}</td>
+    <td class="num red">{{ v.views_fmt }}</td>
+    <td><span class="viral-badge">{{ v.viral_score }}×</span></td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% endif %}
+
+<h2>Top 10 Videos by Views</h2>
+<table>
+  <tr><th>#</th><th>Title</th><th>Published</th><th>Duration</th><th>Views</th><th>Likes</th><th>Comments</th></tr>
+  {% for v in data.top_videos %}
+  <tr>
+    <td>{{ loop.index }}</td>
+    <td><a href="{{ v.url }}">{{ v.title[:65] }}</a></td>
+    <td>{{ v.published }}</td>
+    <td>{{ v.duration }}</td>
+    <td class="num red">{{ v.views }}</td>
+    <td class="num">{{ v.likes }}</td>
+    <td class="num">{{ v.comments }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<footer>
+  Generated by YouTube Channel Analyzer &nbsp;·&nbsp; {{ generated_at }}
+</footer>
+</body>
+</html>

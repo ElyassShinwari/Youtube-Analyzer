@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>YouTube Channel Analyzer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --red:    #ff0000; --red2: #ff4444; --blue: #4488ff; --blue2: #6699ff;
+      --bg:     #080808; --bg2:  #111111; --bg3:  #181818; --bg4:   #222222;
+      --border: rgba(255,255,255,.07); --text: #f0f0f0; --muted: #888; --faint: #444;
+      --sidebar: 240px;
+    }
+    body.light-mode {
+      --bg: #f4f4f5; --bg2: #ffffff; --bg3: #f0f0f0; --bg4: #e8e8e8;
+      --border: rgba(0,0,0,.1); --text: #111; --muted: #555; --faint: #aaa;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; transition: background .25s, color .25s; }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+      display: flex; align-items: center; gap: 10px; padding: 13px 20px;
+      background: rgba(8,8,8,.92); backdrop-filter: blur(18px);
+      border-bottom: 1px solid var(--border);
+      transition: background .25s;
+    }
+    body.light-mode nav { background: rgba(255,255,255,.92); }
+    nav .logo-area { display: flex; align-items: center; gap: 8px; }
+    nav svg.yt-logo { width: 26px; height: 26px; fill: var(--red); flex-shrink: 0; }
+    nav .brand { font-size: .95rem; font-weight: 700; color: var(--text); }
+    nav .nav-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .nav-btn {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+      padding: 6px 12px; font-family: inherit; font-size: .78rem; color: var(--muted);
+      cursor: pointer; transition: border-color .2s, color .2s;
+    }
+    .nav-btn:hover { border-color: var(--red2); color: var(--red2); }
+    .nav-pill { font-size: .7rem; color: var(--muted); background: var(--bg3); border: 1px solid var(--border); padding: 4px 10px; border-radius: 20px; }
+
+    /* ── SIDEBAR ── */
+    #sidebar {
+      position: fixed; top: 49px; left: 0; bottom: 0; width: var(--sidebar);
+      background: var(--bg2); border-right: 1px solid var(--border);
+      overflow-y: auto; z-index: 100; transition: transform .25s;
+      display: flex; flex-direction: column; gap: 0;
+    }
+    body.sidebar-collapsed #sidebar { transform: translateX(calc(-1 * var(--sidebar))); }
+    .sb-section { padding: 14px 14px 4px; }
+    .sb-title { font-size: .68rem; font-weight: 700; color: var(--faint); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 8px; }
+    .sb-item {
+      display: flex; align-items: center; gap: 8px; padding: 7px 8px;
+      border-radius: 8px; cursor: pointer; transition: background .15s;
+      text-decoration: none; color: var(--text);
+    }
+    .sb-item:hover { background: var(--bg3); }
+    .sb-item img  { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: var(--bg4); }
+    .sb-item .sb-name { font-size: .82rem; font-weight: 500; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sb-item .sb-del  { font-size: .75rem; color: var(--faint); padding: 2px 5px; border-radius: 4px; opacity: 0; transition: opacity .15s; }
+    .sb-item:hover .sb-del { opacity: 1; }
+    .sb-item .sb-del:hover { color: var(--red2); }
+    .sb-empty { font-size: .78rem; color: var(--faint); padding: 6px 8px; }
+    .sb-actions { padding: 4px 14px 10px; display: flex; gap: 6px; }
+    .sb-link { font-size: .75rem; color: var(--muted); cursor: pointer; background: none; border: none; font-family: inherit; padding: 0; }
+    .sb-link:hover { color: var(--red2); }
+    .sb-divider { border: none; border-top: 1px solid var(--border); margin: 4px 14px; }
+    .sb-settings { padding: 10px 14px; margin-top: auto; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border); }
+    .sb-settings-btn { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: .82rem; color: var(--muted); transition: background .15s; }
+    .sb-settings-btn:hover { background: var(--bg3); color: var(--text); }
+
+    /* ── MAIN CONTENT ── */
+    #main { margin-left: var(--sidebar); margin-top: 49px; transition: margin-left .25s; }
+    body.sidebar-collapsed #main { margin-left: 0; }
+
+    /* ── ALERT BANNER ── */
+    #alert-banner {
+      display: none; background: rgba(255,0,0,.1); border-bottom: 1px solid rgba(255,0,0,.25);
+      padding: 12px 24px; color: var(--text);
+    }
+    #alert-banner .ab-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: flex-start; gap: 12px; }
+    #alert-banner .ab-dismiss { margin-left: auto; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; }
+
+    /* ── HERO ── */
+    .hero {
+      position: relative; display: flex; flex-direction: column; align-items: center;
+      padding: 52px 20px 44px; text-align: center; overflow: hidden;
+    }
+    .hero::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(255,0,0,.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero h1 {
+      font-size: clamp(1.7rem, 3.5vw, 2.8rem); font-weight: 800;
+      letter-spacing: -.5px; line-height: 1.15; margin-bottom: 10px;
+      background: linear-gradient(135deg, var(--text) 40%, #ff6666);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .hero p { color: var(--muted); font-size: .92rem; margin-bottom: 24px; max-width: 460px; }
+    .mode-toggle { display: flex; background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 22px; }
+    .mode-btn { padding: 9px 26px; font-family: inherit; font-size: .86rem; font-weight: 600; background: none; border: none; color: var(--muted); cursor: pointer; transition: background .2s, color .2s; }
+    .mode-btn.active { background: var(--red); color: #fff; }
+
+    /* ── SEARCH ── */
+    #mode-single { width: 100%; max-width: 600px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .search-wrap { display: flex; width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: 13px; overflow: hidden; box-shadow: 0 0 0 1px rgba(255,0,0,.07), 0 8px 32px rgba(0,0,0,.4); transition: box-shadow .2s; }
+    .search-wrap:focus-within { box-shadow: 0 0 0 2px rgba(255,0,0,.35), 0 8px 40px rgba(0,0,0,.5); }
+    .search-wrap input { flex: 1; padding: 14px 18px; font-size: .95rem; font-family: inherit; background: transparent; border: none; outline: none; color: var(--text); }
+    .search-wrap input::placeholder { color: var(--faint); }
+    .search-wrap button { padding: 0 24px; background: var(--red); border: none; color: #fff; font-family: inherit; font-size: .88rem; font-weight: 600; cursor: pointer; transition: background .2s; white-space: nowrap; }
+    .search-wrap button:hover { background: #cc0000; }
+    .examples { display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; }
+    .examples span { font-size: .75rem; color: var(--muted); background: var(--bg3); border: 1px solid var(--border); padding: 4px 11px; border-radius: 20px; cursor: pointer; transition: border-color .2s, color .2s; }
+    .examples span:hover { border-color: var(--red2); color: var(--red2); }
+
+    /* ── COMPARE SEARCH ── */
+    #mode-compare { display: none; flex-direction: column; align-items: center; gap: 12px; width: 100%; max-width: 840px; }
+    .compare-inputs { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; width: 100%; }
+    .vs-badge { width: 38px; height: 38px; background: var(--bg3); border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .9rem; font-weight: 800; color: var(--faint); }
+    .compare-inputs .search-wrap.b button { background: var(--blue); }
+    #btn-compare { padding: 11px 30px; background: linear-gradient(90deg, var(--red), var(--blue)); border: none; border-radius: 10px; color: #fff; font-family: inherit; font-size: .88rem; font-weight: 700; cursor: pointer; transition: opacity .2s; }
+    #btn-compare:hover { opacity: .85; }
+
+    /* ── LOADER ── */
+    #error-msg { display: none; text-align: center; color: #ff6b6b; background: rgba(255,0,0,.08); border: 1px solid rgba(255,0,0,.2); border-radius: 10px; padding: 13px 22px; max-width: 620px; margin: 0 auto 20px; }
+    #loader { display: none; flex-direction: column; align-items: center; padding: 70px 20px; gap: 18px; }
+    .loader-ring { width: 50px; height: 50px; border: 3px solid var(--bg4); border-top-color: var(--red); border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loader p { color: var(--muted); font-size: .9rem; }
+    #loader .dots::after { content: ''; animation: dots 1.5s steps(4,end) infinite; }
+    @keyframes dots { 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} }
+
+    /* ── RESULTS WRAPPER ── */
+    @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+    .results-wrap { display: none; max-width: 1260px; margin: 0 auto; padding: 0 20px 80px; animation: fadeUp .35s ease; }
+
+    /* ── SHARED CARD ── */
+    .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 22px; }
+    .card h3 { font-size: .88rem; font-weight: 600; color: var(--text); margin-bottom: 16px; display: flex; align-items: center; gap: 7px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+    .dot.red  { background: var(--red);  box-shadow: 0 0 5px var(--red); }
+    .dot.blue { background: var(--blue); box-shadow: 0 0 5px var(--blue); }
+    .dot.grn  { background: #22c55e;     box-shadow: 0 0 5px #22c55e; }
+
+    /* ── TABS ── */
+    .tab-bar { display: flex; gap: 2px; background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 3px; margin-bottom: 18px; width: fit-content; }
+    .tab-btn { padding: 7px 18px; border-radius: 8px; background: none; border: none; font-family: inherit; font-size: .83rem; font-weight: 600; color: var(--muted); cursor: pointer; transition: background .2s, color .2s; }
+    .tab-btn.active { background: var(--bg2); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── CHANNEL HEADER ── */
+    .channel-header { position: relative; background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 24px 28px; margin-bottom: 16px; overflow: hidden; display: flex; align-items: flex-start; gap: 18px; }
+    .channel-header::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--red), #ff6644, var(--red)); }
+    .ch-avatar { width: 68px; height: 68px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: var(--bg4); border: 2px solid var(--border); }
+    .ch-info { flex: 1; min-width: 0; }
+    .ch-info h2 { font-size: 1.6rem; font-weight: 800; color: var(--text); margin-bottom: 5px; }
+    .ch-meta { display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: .8rem; margin-bottom: 8px; }
+    .ch-desc { color: #999; font-size: .85rem; line-height: 1.55; }
+    .ch-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .ch-btn { padding: 6px 14px; border-radius: 7px; font-family: inherit; font-size: .78rem; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--bg3); color: var(--muted); transition: all .2s; }
+    .ch-btn:hover { border-color: var(--red2); color: var(--red2); }
+    .ch-btn.pinned { background: rgba(255,0,0,.1); border-color: rgba(255,0,0,.3); color: var(--red2); }
+
+    /* ── STATS GRID ── */
+    .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 16px; }
+    .stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 13px; padding: 18px 16px; display: flex; flex-direction: column; gap: 4px; position: relative; overflow: hidden; transition: border-color .2s, transform .15s; }
+    .stat-card:hover { border-color: rgba(255,0,0,.3); transform: translateY(-2px); }
+    .stat-card .icon { font-size: 1.1rem; margin-bottom: 2px; }
+    .stat-card .val  { font-size: 1.55rem; font-weight: 800; color: var(--text); letter-spacing: -.5px; }
+    .stat-card .lbl  { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; }
+    .stat-card::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--red), transparent); opacity: 0; transition: opacity .2s; }
+    .stat-card:hover::after { opacity: 1; }
+
+    /* ── CHARTS ROW ── */
+    .charts-row { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; margin-bottom: 16px; }
+    .charts-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .charts-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+    /* ── VIDEO GRID ── */
+    .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 13px; }
+    .video-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 11px; overflow: hidden; text-decoration: none; color: inherit; display: flex; flex-direction: column; transition: border-color .2s, transform .2s, box-shadow .2s; }
+    .video-card:hover { border-color: rgba(255,0,0,.35); transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+    .video-thumb { position: relative; aspect-ratio: 16/9; overflow: hidden; }
+    .video-thumb img { width:100%; height:100%; object-fit:cover; display:block; transition: transform .3s; }
+    .video-card:hover .video-thumb img { transform: scale(1.04); }
+    .video-thumb .v-dur  { position:absolute; bottom:5px; right:5px; background:rgba(0,0,0,.85); color:#fff; font-size:.68rem; font-weight:600; padding:2px 6px; border-radius:3px; }
+    .video-thumb .v-rank { position:absolute; top:5px; left:5px; background:var(--red); color:#fff; font-size:.66rem; font-weight:700; padding:2px 7px; border-radius:4px; }
+    .video-info { padding: 11px; flex:1; display:flex; flex-direction:column; gap:4px; }
+    .video-title { font-size:.82rem; font-weight:600; color:var(--text); line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .video-date  { font-size:.7rem; color:var(--muted); }
+    .video-stats { display:flex; gap:9px; margin-top:auto; padding-top:7px; border-top:1px solid var(--border); }
+    .si { display:flex; align-items:center; gap:3px; font-size:.72rem; color:var(--muted); }
+    .si.hl { color:#ff6666; font-weight:600; }
+    .si svg { width:10px; height:10px; fill:currentColor; }
+    .viral-badge { font-size:.64rem; font-weight:700; background: rgba(255,0,0,.15); color:var(--red2); padding:1px 6px; border-radius:4px; margin-left:auto; }
+
+    /* ── VIDEOS TABLE ── */
+    .vt-wrap { overflow-x: auto; }
+    .vt { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    .vt th { text-align: left; padding: 9px 12px; color: var(--muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .6px; border-bottom: 1px solid var(--border); cursor: pointer; white-space: nowrap; user-select: none; }
+    .vt th:hover { color: var(--red2); }
+    .vt td { padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+    .vt tr:hover td { background: var(--bg3); }
+    .vt td a { color: var(--text); text-decoration: none; }
+    .vt td a:hover { color: var(--red2); }
+    .vt td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .vt td.red { color: #ff6666; font-weight: 700; }
+    .sort-arrow { opacity: .4; margin-left: 3px; }
+    .sort-arrow.active { opacity: 1; color: var(--red2); }
+
+    /* ── EXPORT TAB ── */
+    .export-btns { display: flex; gap: 14px; flex-wrap: wrap; }
+    .export-btn { display: flex; align-items: center; gap: 10px; padding: 16px 24px; background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; font-family: inherit; font-size: .9rem; font-weight: 600; color: var(--text); transition: border-color .2s, background .2s; }
+    .export-btn:hover { border-color: var(--red2); background: var(--bg4); }
+    .export-btn .eicon { font-size: 1.5rem; }
+    .export-btn .etxt p { font-size: .75rem; color: var(--muted); font-weight: 400; margin-top: 2px; }
+
+    /* ── COMPARE ── */
+    .compare-header { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; margin-bottom: 16px; align-items: stretch; }
+    .ch-panel { position: relative; background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 20px; overflow: hidden; }
+    .ch-panel.a::before { content:''; position:absolute; top:0;left:0;right:0;height:3px; background:var(--red); }
+    .ch-panel.b::before { content:''; position:absolute; top:0;left:0;right:0;height:3px; background:var(--blue); }
+    .ch-panel h2 { font-size:1.3rem; font-weight:800; color:var(--text); margin-bottom:4px; }
+    .ch-panel .ch-meta { font-size:.76rem; color:var(--muted); }
+    .vs-center { display:flex; align-items:center; justify-content:center; font-size:1.4rem; font-weight:900; color:var(--faint); min-width:44px; }
+    .cmp-row { display: grid; grid-template-columns: 1fr 160px 1fr; gap: 0; margin-bottom: 9px; align-items: center; }
+    .cmp-val { background: var(--bg2); border: 1px solid var(--border); padding: 12px 16px; font-size:.92rem; font-weight:700; color:var(--text); }
+    .cmp-val.a { border-radius:9px 0 0 9px; text-align:right; }
+    .cmp-val.b { border-radius:0 9px 9px 0; text-align:left; }
+    .cmp-val.wa { background:rgba(255,0,0,.1); border-color:rgba(255,0,0,.25); color:#ff6666; }
+    .cmp-val.wb { background:rgba(68,136,255,.1); border-color:rgba(68,136,255,.25); color:#6699ff; }
+    .cmp-label { background:var(--bg3); border-top:1px solid var(--border); border-bottom:1px solid var(--border); padding:12px 8px; font-size:.68rem; font-weight:600; color:var(--muted); text-align:center; text-transform:uppercase; letter-spacing:.6px; }
+    .winner-banner { background:var(--bg2); border:1px solid var(--border); border-radius:14px; padding:24px 28px; margin-bottom:16px; display:flex; align-items:center; gap:18px; }
+    .winner-trophy { font-size:2.4rem; }
+    .winner-banner h2 { font-size:1.3rem; font-weight:800; color:var(--text); margin-bottom:3px; }
+    .winner-banner p  { color:var(--muted); font-size:.84rem; }
+    .winner-pills { display:flex; gap:7px; flex-wrap:wrap; margin-top:8px; }
+    .wpill { font-size:.72rem; font-weight:600; padding:3px 11px; border-radius:20px; }
+    .wpill.a { background:rgba(255,0,0,.12); color:var(--red2); border:1px solid rgba(255,0,0,.22); }
+    .wpill.b { background:rgba(68,136,255,.12); color:var(--blue2); border:1px solid rgba(68,136,255,.22); }
+    .compare-videos { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+    .compare-charts { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+
+    /* ── MODALS ── */
+    .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:500; align-items:center; justify-content:center; }
+    .modal-bg.open { display:flex; }
+    .modal { background:var(--bg2); border:1px solid var(--border); border-radius:16px; padding:28px; width:100%; max-width:460px; max-height:90vh; overflow-y:auto; position:relative; }
+    .modal h2 { font-size:1.1rem; font-weight:700; color:var(--text); margin-bottom:20px; }
+    .modal-close { position:absolute; top:16px; right:18px; background:none; border:none; font-size:1.3rem; color:var(--muted); cursor:pointer; }
+    .modal-close:hover { color:var(--text); }
+    .form-group { margin-bottom:14px; }
+    .form-group label { display:block; font-size:.75rem; color:var(--muted); margin-bottom:5px; text-transform:uppercase; letter-spacing:.5px; }
+    .form-group input, .form-group select {
+      width:100%; padding:10px 13px; background:var(--bg3); border:1px solid var(--border);
+      border-radius:8px; color:var(--text); font-family:inherit; font-size:.9rem; outline:none;
+      transition: border-color .2s;
+    }
+    .form-group input:focus, .form-group select:focus { border-color: rgba(255,0,0,.4); }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .modal-actions { display:flex; gap:10px; margin-top:20px; }
+    .modal-btn { flex:1; padding:10px; border-radius:8px; font-family:inherit; font-size:.88rem; font-weight:600; cursor:pointer; border:1px solid var(--border); background:var(--bg3); color:var(--text); transition:all .2s; }
+    .modal-btn.primary { background:var(--red); border-color:var(--red); color:#fff; }
+    .modal-btn.primary:hover { background:#cc0000; }
+    .modal-btn:hover { border-color:var(--muted); }
+    .modal-status { margin-top:10px; font-size:.8rem; padding:8px 12px; border-radius:7px; display:none; }
+    .modal-status.ok  { background:rgba(34,197,94,.12); color:#22c55e; display:block; }
+    .modal-status.err { background:rgba(255,0,0,.1); color:#ff6666; display:block; }
+
+    .toggle-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border); }
+    .toggle-row label { font-size:.85rem; color:var(--text); }
+    .toggle { width:38px; height:22px; border-radius:11px; background:var(--bg4); border:1px solid var(--border); position:relative; cursor:pointer; transition:background .2s; }
+    .toggle.on { background:var(--red); }
+    .toggle::after { content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:transform .2s; }
+    .toggle.on::after { transform:translateX(16px); }
+
+    .foot-note { text-align:center; color:var(--faint); font-size:.76rem; margin-top:24px; }
+
+    /* ── HEALTH SCORE BADGE ── */
+    .health-badge { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px; font-size:.8rem; font-weight:700; border:1px solid; margin-left:10px; }
+    .health-A { background:rgba(34,197,94,.12); border-color:rgba(34,197,94,.3); color:#22c55e; }
+    .health-B { background:rgba(59,130,246,.12); border-color:rgba(59,130,246,.3); color:#3b82f6; }
+    .health-C { background:rgba(245,158,11,.12); border-color:rgba(245,158,11,.3); color:#f59e0b; }
+    .health-D { background:rgba(239,68,68,.12);  border-color:rgba(239,68,68,.3);  color:#ef4444; }
+
+    /* ── DELTA BADGE (niche benchmark) ── */
+    .delta-badge { font-size:.65rem; font-weight:700; padding:1px 6px; border-radius:4px; margin-top:2px; display:inline-block; }
+    .delta-up   { background:rgba(34,197,94,.15); color:#22c55e; }
+    .delta-down { background:rgba(239,68,68,.12); color:#ef4444; }
+
+    /* ── REVENUE CARDS ── */
+    .revenue-row { display:flex; gap:10px; margin-bottom:16px; }
+    .rev-card { flex:1; background:var(--bg2); border:1px solid var(--border); border-radius:13px; padding:16px; text-align:center; }
+    .rev-card .rv  { font-size:1.3rem; font-weight:800; color:var(--text); }
+    .rev-card .rl  { font-size:.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-top:3px; }
+
+    /* ── SEARCH AUTOCOMPLETE ── */
+    .search-dropdown { position:absolute; top:100%; left:0; right:0; background:var(--bg2); border:1px solid var(--border); border-radius:0 0 10px 10px; z-index:300; display:none; }
+    .search-dropdown.open { display:block; }
+    .sd-item { display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer; transition:background .15s; }
+    .sd-item:hover { background:var(--bg3); }
+    .sd-item img { width:32px; height:32px; border-radius:50%; object-fit:cover; background:var(--bg4); }
+    .sd-item .sd-name { font-size:.88rem; font-weight:600; flex:1; }
+    .sd-item .sd-subs { font-size:.75rem; color:var(--muted); }
+    .search-wrap { position:relative; }
+
+    /* ── LEADERBOARD TABLE ── */
+    .lb-wrap { overflow-x:auto; }
+    .lb-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    .lb-table th { padding:9px 12px; text-align:left; color:var(--muted); font-size:.7rem; text-transform:uppercase; letter-spacing:.6px; border-bottom:1px solid var(--border); cursor:pointer; white-space:nowrap; }
+    .lb-table th:hover { color:var(--red2); }
+    .lb-table td { padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+    .lb-table tr:hover td { background:var(--bg3); }
+    .lb-table td.num { text-align:right; font-variant-numeric:tabular-nums; font-weight:600; }
+    .lb-rank { width:28px; height:28px; border-radius:50%; background:var(--bg4); display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:.82rem; }
+    .lb-rank.gold   { background:#f59e0b; color:#000; }
+    .lb-rank.silver { background:#94a3b8; color:#000; }
+    .lb-rank.bronze { background:#b45309; color:#fff; }
+
+    /* ── TAG PILLS ── */
+    .tag-pill { display:inline-block; font-size:.65rem; font-weight:600; padding:2px 8px; border-radius:10px; background:rgba(68,136,255,.15); border:1px solid rgba(68,136,255,.25); color:var(--blue2); cursor:pointer; transition:background .15s; margin-right:3px; margin-top:3px; }
+    .tag-pill:hover { background:rgba(68,136,255,.3); }
+    .tag-filter-bar { padding:6px 14px; display:flex; gap:5px; flex-wrap:wrap; align-items:center; border-bottom:1px solid var(--border); }
+    .tag-filter-clear { font-size:.72rem; color:var(--muted); cursor:pointer; margin-left:auto; }
+    .tag-filter-clear:hover { color:var(--red2); }
+
+    /* ── THUMBNAIL GRID ── */
+    .thumb-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
+    .thumb-item { position:relative; aspect-ratio:16/9; border-radius:6px; overflow:hidden; cursor:pointer; }
+    .thumb-item img { width:100%; height:100%; object-fit:cover; transition:transform .2s; }
+    .thumb-item:hover img { transform:scale(1.05); }
+    .thumb-item .t-overlay { position:absolute; inset:0; background:rgba(0,0,0,0); display:flex; align-items:flex-end; padding:5px; opacity:0; transition:all .2s; }
+    .thumb-item:hover .t-overlay { background:rgba(0,0,0,.55); opacity:1; }
+    .thumb-item .t-title { font-size:.65rem; color:#fff; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+
+    /* ── SEO SECTION ── */
+    .seo-bar-wrap { margin-bottom:8px; }
+    .seo-bar-label { display:flex; justify-content:space-between; font-size:.75rem; color:var(--text); margin-bottom:2px; }
+    .seo-bar-label span:first-child { flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; margin-right:8px; }
+    .seo-bar-bg { background:var(--bg4); border-radius:4px; height:6px; }
+    .seo-bar-fill { background:var(--blue); border-radius:4px; height:6px; transition:width .4s; }
+    .seo-avg-badge { display:inline-flex; align-items:center; gap:6px; padding:5px 14px; border-radius:20px; background:rgba(59,130,246,.12); border:1px solid rgba(59,130,246,.25); color:#3b82f6; font-size:.85rem; font-weight:700; margin-bottom:14px; }
+
+    /* ── SHORTCUTS TABLE ── */
+    .shortcut-row { display:flex; align-items:center; gap:14px; padding:9px 0; border-bottom:1px solid var(--border); }
+    .shortcut-key { font-family:monospace; background:var(--bg3); border:1px solid var(--border); border-radius:5px; padding:2px 8px; font-size:.8rem; white-space:nowrap; color:var(--text); }
+    .shortcut-desc { font-size:.84rem; color:var(--muted); }
+
+    /* ── LEADERBOARD MODE ── */
+    #mode-leaderboard { display:none; flex-direction:column; align-items:center; gap:12px; width:100%; max-width:700px; }
+    #mode-leaderboard textarea { width:100%; height:140px; padding:12px 16px; background:var(--bg3); border:1px solid var(--border); border-radius:13px; color:var(--text); font-family:inherit; font-size:.88rem; outline:none; resize:vertical; }
+    #mode-leaderboard textarea:focus { border-color:rgba(255,0,0,.4); }
+    #lb-metric-select { padding:8px 12px; background:var(--bg3); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:.85rem; }
+    #leaderboard-results { display:none; max-width:1260px; margin:0 auto; padding:0 20px 80px; animation:fadeUp .35s ease; }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo-area">
+    <button class="nav-btn" onclick="toggleSidebar()" title="Toggle sidebar">☰</button>
+    <svg class="yt-logo" viewBox="0 0 24 24"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.8 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
+    <span class="brand">Channel Analyzer</span>
+  </div>
+  <div class="nav-right">
+    <button class="nav-btn" onclick="toggleLight()" id="light-btn">☀ Light</button>
+    <div class="nav-pill">YouTube Data API v3</div>
+  </div>
+</nav>
+
+<!-- SIDEBAR -->
+<aside id="sidebar">
+  <div class="sb-section">
+    <div class="sb-title">📌 Pinned Channels</div>
+    <div id="sb-pinned"><div class="sb-empty">No pinned channels yet</div></div>
+  </div>
+  <hr class="sb-divider"/>
+  <div class="sb-section">
+    <div class="sb-title">🕘 Recent Searches</div>
+    <div id="sb-history"><div class="sb-empty">No searches yet</div></div>
+  </div>
+  <div class="sb-actions">
+    <button class="sb-link" onclick="clearHistory()">Clear history</button>
+  </div>
+  <div class="sb-settings">
+    <div class="sb-settings-btn" onclick="openModal('modal-smtp')">⚙ Email &amp; SMTP Settings</div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- Alert Banner -->
+  <div id="alert-banner">
+    <div class="ab-inner">
+      <span>⚠️</span>
+      <div id="alert-banner-text" style="flex:1"></div>
+      <button class="ab-dismiss" onclick="document.getElementById('alert-banner').style.display='none'">✕</button>
+    </div>
+  </div>
+
+  <!-- Hero -->
+  <section class="hero">
+    <h1>YouTube Channel<br/>Analytics Dashboard</h1>
+    <p>Deep insights — subscribers, engagement, upload patterns, trends &amp; alerts.</p>
+    <div class="mode-toggle">
+      <button class="mode-btn active" onclick="setMode('single')">🔍 Analyze</button>
+      <button class="mode-btn"        onclick="setMode('compare')">⚔️ Compare</button>
+    </div>
+
+    <div id="mode-single">
+      <div class="search-wrap">
+        <input id="query" type="text" placeholder="@MrBeast · youtube.com/@channel · channel name…"/>
+        <button onclick="runAnalysis()">Analyze →</button>
+      </div>
+      <div class="examples">
+        <span onclick="setQuery('@MrBeast')">@MrBeast</span>
+        <span onclick="setQuery('@veritasium')">@veritasium</span>
+        <span onclick="setQuery('@LinusTechTips')">@LinusTechTips</span>
+        <span onclick="setQuery('@kurzgesagt')">@kurzgesagt</span>
+        <span onclick="setQuery('@mkbhd')">@mkbhd</span>
+      </div>
+    </div>
+
+    <div id="mode-compare">
+      <div class="compare-inputs">
+        <div class="search-wrap a">
+          <input id="query-a" type="text" placeholder="Channel A — @MrBeast"/>
+          <button style="background:var(--red)" onclick="runCompare()">A</button>
+        </div>
+        <div class="vs-badge">VS</div>
+        <div class="search-wrap b">
+          <input id="query-b" type="text" placeholder="Channel B — @veritasium"/>
+          <button style="background:var(--blue)" onclick="runCompare()">B</button>
+        </div>
+      </div>
+      <button id="btn-compare" onclick="runCompare()">Compare Channels →</button>
+      <div class="examples">
+        <span onclick="setCompare('@MrBeast','@PewDiePie')">MrBeast vs PewDiePie</span>
+        <span onclick="setCompare('@veritasium','@kurzgesagt')">Veritasium vs Kurzgesagt</span>
+        <span onclick="setCompare('@LinusTechTips','@mkbhd')">LTT vs MKBHD</span>
+      </div>
+    </div>
+  </section>
+
+  <div style="padding:0 20px;"><div id="error-msg"></div></div>
+  <div id="loader" style="display:none;flex-direction:column;align-items:center;padding:70px 20px;gap:18px;">
+    <div class="loader-ring"></div>
+    <p>Fetching channel data<span class="dots"></span></p>
+    <p style="font-size:.76rem;color:#555;">Analyzing up to 200 videos per channel</p>
+  </div>
+
+  <!-- ── SINGLE RESULTS ── -->
+  <div id="results" class="results-wrap">
+    <div class="channel-header">
+      <img class="ch-avatar" id="ch-avatar" src="" alt=""/>
+      <div class="ch-info">
+        <h2 id="ch-name"></h2>
+        <div class="ch-meta"><span>📅 <b id="ch-created"></b></span><span>🌍 <b id="ch-country"></b></span></div>
+        <div class="ch-desc" id="ch-desc"></div>
+        <div class="ch-actions">
+          <button class="ch-btn" id="pin-btn" onclick="togglePin()">📌 Pin Channel</button>
+          <button class="ch-btn" onclick="openAlertModal()">🔔 Set Alert</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="overview"  onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn"        data-tab="analytics" onclick="switchTab('analytics')">Analytics</button>
+      <button class="tab-btn"        data-tab="videos"    onclick="switchTab('videos')">All Videos</button>
+      <button class="tab-btn"        data-tab="export"    onclick="switchTab('export')">Export</button>
+    </div>
+
+    <!-- TAB: OVERVIEW -->
+    <div id="tab-overview" class="tab-panel active">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="icon">👥</div><div class="val" id="s-subs"></div><div class="lbl">Subscribers</div></div>
+        <div class="stat-card"><div class="icon">▶️</div><div class="val" id="s-views"></div><div class="lbl">Total Views</div></div>
+        <div class="stat-card"><div class="icon">🎬</div><div class="val" id="s-vcount"></div><div class="lbl">Videos Published</div></div>
+        <div class="stat-card"><div class="icon">📈</div><div class="val" id="s-avg"></div><div class="lbl">Avg Views/Video</div></div>
+        <div class="stat-card"><div class="icon">❤️</div><div class="val" id="s-eng"></div><div class="lbl">Engagement Rate</div></div>
+        <div class="stat-card"><div class="icon">🕐</div><div class="val" id="s-freq"></div><div class="lbl">Upload Frequency</div></div>
+        <div class="stat-card"><div class="icon">👍</div><div class="val" id="s-alikes"></div><div class="lbl">Avg Likes/Video</div></div>
+        <div class="stat-card"><div class="icon">💬</div><div class="val" id="s-acomments"></div><div class="lbl">Avg Comments/Video</div></div>
+      </div>
+      <div class="charts-row">
+        <div class="card"><h3><span class="dot red"></span>Monthly Uploads — Last 12 Months</h3><canvas id="chart-monthly" height="150"></canvas></div>
+        <div class="card"><h3><span class="dot red"></span>Views Distribution</h3><canvas id="chart-dist" height="150"></canvas></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <h3><span class="dot red"></span>Top 10 Videos by Views</h3>
+        <div class="video-grid" id="video-grid"></div>
+      </div>
+    </div>
+
+    <!-- TAB: ANALYTICS -->
+    <div id="tab-analytics" class="tab-panel">
+      <div class="charts-row-2">
+        <div class="card"><h3><span class="dot grn"></span>Best Day to Post (Avg Views)</h3><canvas id="chart-day" height="180"></canvas></div>
+        <div class="card"><h3><span class="dot grn"></span>Views Over Time</h3><canvas id="chart-time" height="180"></canvas></div>
+      </div>
+      <div class="charts-row-2">
+        <div class="card"><h3><span class="dot grn"></span>Optimal Video Length</h3><canvas id="chart-length" height="180"></canvas></div>
+        <div class="card"><h3><span class="dot grn"></span>Shorts vs Long-form</h3><canvas id="chart-shorts" height="180"></canvas></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <h3><span class="dot grn"></span>Top Title Keywords (by Avg Views)</h3>
+        <canvas id="chart-keywords" height="120"></canvas>
+      </div>
+      <div class="card" style="margin-bottom:16px;" id="viral-section">
+        <h3><span class="dot red"></span>Viral Videos (3× Channel Average)</h3>
+        <div class="video-grid" id="viral-grid"></div>
+        <p id="no-viral" style="color:var(--muted);font-size:.85rem;padding:10px 0;display:none">No viral videos found in the analyzed set.</p>
+      </div>
+    </div>
+
+    <!-- TAB: ALL VIDEOS -->
+    <div id="tab-videos" class="tab-panel">
+      <div class="card" style="margin-bottom:16px;">
+        <h3><span class="dot red"></span>All Fetched Videos <span id="vid-count-label" style="color:var(--muted);font-weight:400;font-size:.8rem;margin-left:6px"></span></h3>
+        <div class="vt-wrap">
+          <table class="vt" id="all-vids-table">
+            <thead>
+              <tr>
+                <th onclick="sortTable('published')">#&nbsp;<span class="sort-arrow" data-col="published">↕</span></th>
+                <th>Title</th>
+                <th onclick="sortTable('published')">Published <span class="sort-arrow" data-col="published">↕</span></th>
+                <th onclick="sortTable('views_raw')">Views <span class="sort-arrow" data-col="views_raw">↕</span></th>
+                <th onclick="sortTable('likes_raw')">Likes <span class="sort-arrow" data-col="likes_raw">↕</span></th>
+                <th onclick="sortTable('comments_raw')">Comments <span class="sort-arrow" data-col="comments_raw">↕</span></th>
+                <th>Duration</th>
+                <th onclick="sortTable('viral_score')">Viral Score <span class="sort-arrow" data-col="viral_score">↕</span></th>
+              </tr>
+            </thead>
+            <tbody id="all-vids-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: EXPORT -->
+    <div id="tab-export" class="tab-panel">
+      <div class="card" style="margin-bottom:16px;">
+        <h3><span class="dot red"></span>Export &amp; Reports</h3>
+        <div class="export-btns">
+          <button class="export-btn" onclick="downloadCSV()">
+            <span class="eicon">📥</span>
+            <div class="etxt"><div>Download CSV</div><p>All video stats as spreadsheet</p></div>
+          </button>
+          <button class="export-btn" onclick="printReport()">
+            <span class="eicon">📄</span>
+            <div class="etxt"><div>Print / Save PDF</div><p>Full report — printable &amp; shareable</p></div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <p class="foot-note" id="fetched-note"></p>
+  </div><!-- end #results -->
+
+  <!-- ── COMPARE RESULTS ── -->
+  <div id="compare-results" class="results-wrap">
+    <div class="winner-banner">
+      <div class="winner-trophy">🏆</div>
+      <div>
+        <h2 id="cmp-winner-title"></h2>
+        <p id="cmp-winner-sub"></p>
+        <div class="winner-pills" id="cmp-winner-pills"></div>
+      </div>
+    </div>
+    <div class="compare-header">
+      <div class="ch-panel a"><h2 id="cmp-name-a"></h2><div class="ch-meta" id="cmp-meta-a"></div></div>
+      <div class="vs-center">VS</div>
+      <div class="ch-panel b"><h2 id="cmp-name-b"></h2><div class="ch-meta" id="cmp-meta-b"></div></div>
+    </div>
+    <div class="compare-stats card" style="margin-bottom:16px;padding:16px;">
+      <div id="cmp-stats-rows"></div>
+    </div>
+    <div class="compare-charts">
+      <div class="card"><h3><span class="dot red"></span>Monthly Uploads</h3><canvas id="cmp-chart-monthly" height="180"></canvas></div>
+      <div class="card"><h3><span class="dot blue"></span>Performance Radar</h3><canvas id="cmp-chart-radar" height="180"></canvas></div>
+    </div>
+    <div class="compare-videos">
+      <div class="card a">
+        <h3><span class="dot red"></span>Top Videos — <span id="cmp-vid-label-a" style="color:var(--red2)"></span></h3>
+        <div class="video-grid" id="cmp-vid-grid-a"></div>
+      </div>
+      <div class="card b">
+        <h3><span class="dot blue"></span>Top Videos — <span id="cmp-vid-label-b" style="color:var(--blue2)"></span></h3>
+        <div class="video-grid" id="cmp-vid-grid-b"></div>
+      </div>
+    </div>
+    <p class="foot-note" id="cmp-fetched-note"></p>
+  </div>
+
+</div><!-- end #main -->
+
+<!-- ── SMTP MODAL ── -->
+<div class="modal-bg" id="modal-smtp" onclick="if(event.target===this)closeModal('modal-smtp')">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-smtp')">✕</button>
+    <h2>⚙️ Email &amp; SMTP Settings</h2>
+    <p style="color:var(--muted);font-size:.82rem;margin-bottom:18px;">Configure where alert emails are sent from. Use Gmail, Outlook, or any SMTP provider.</p>
+    <div class="form-group"><label>SMTP Host</label><input id="smtp-host" placeholder="smtp.gmail.com"/></div>
+    <div class="form-row">
+      <div class="form-group"><label>Port</label><input id="smtp-port" type="number" value="587"/></div>
+      <div class="form-group"><label>From Email</label><input id="smtp-from" placeholder="you@gmail.com"/></div>
+    </div>
+    <div class="form-group"><label>Username</label><input id="smtp-user" placeholder="your email address"/></div>
+    <div class="form-group"><label>Password / App Password</label><input id="smtp-pass" type="password" placeholder="••••••••"/></div>
+    <div class="toggle-row">
+      <label>Use TLS (recommended)</label>
+      <div class="toggle on" id="smtp-tls" onclick="this.classList.toggle('on')"></div>
+    </div>
+    <p style="color:var(--muted);font-size:.75rem;margin-top:10px;">💡 For Gmail, generate an <b>App Password</b> at myaccount.google.com → Security → App Passwords</p>
+    <div class="form-group" style="margin-top:14px;">
+      <label>Test Email Address</label>
+      <div style="display:flex;gap:8px;">
+        <input id="smtp-test-addr" style="flex:1" placeholder="send test to this address…"/>
+        <button class="modal-btn" style="flex:none;padding:10px 16px" onclick="sendTestEmail()">Send Test</button>
+      </div>
+    </div>
+    <div class="modal-status" id="smtp-status"></div>
+    <div class="modal-actions">
+      <button class="modal-btn" onclick="closeModal('modal-smtp')">Cancel</button>
+      <button class="modal-btn primary" onclick="saveSmtp()">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ALERT MODAL ── -->
+<div class="modal-bg" id="modal-alert" onclick="if(event.target===this)closeModal('modal-alert')">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-alert')">✕</button>
+    <h2>🔔 Alert Settings</h2>
+    <p style="color:var(--muted);font-size:.82rem;margin-bottom:18px;">Get notified when this channel spikes or drops. Leave email blank to disable.</p>
+    <div class="form-group"><label>Alert Email (optional)</label><input id="alert-email" placeholder="your@email.com (leave empty to skip)"/></div>
+    <div class="form-row">
+      <div class="form-group"><label>Spike Threshold %</label><input id="alert-spike" type="number" value="50" min="5" max="500"/></div>
+      <div class="form-group"><label>Drop Threshold %</label><input id="alert-drop" type="number" value="40" min="5" max="500"/></div>
+    </div>
+    <div class="form-group">
+      <label>Report Frequency</label>
+      <select id="alert-freq">
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+      </select>
+    </div>
+    <div class="toggle-row">
+      <label>Enable Alerts</label>
+      <div class="toggle on" id="alert-enabled" onclick="this.classList.toggle('on')"></div>
+    </div>
+    <div class="modal-status" id="alert-status"></div>
+    <div class="modal-actions">
+      <button class="modal-btn" onclick="deleteAlert()">Remove Alert</button>
+      <button class="modal-btn primary" onclick="saveAlert()">Save Alert</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────────────────
+let mode = 'single';
+let currentData = null;          // full /analyze response
+let currentChannelId = null;
+let sortCol = 'views_raw', sortAsc = false;
+let charts = {};                 // keyed by canvas id
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // Light mode
+  if (localStorage.getItem('lightMode') === '1') {
+    document.body.classList.add('light-mode');
+    document.getElementById('light-btn').textContent = '🌙 Dark';
+  }
+  // Keyboard shortcuts
+  document.getElementById('query').addEventListener('keydown', e => { if(e.key==='Enter') runAnalysis(); });
+  document.getElementById('query-a').addEventListener('keydown', e => { if(e.key==='Enter') runCompare(); });
+  document.getElementById('query-b').addEventListener('keydown', e => { if(e.key==='Enter') runCompare(); });
+  document.addEventListener('keydown', e => { if(e.key==='Escape') { closeModal('modal-smtp'); closeModal('modal-alert'); }});
+  loadSidebar();
+  startupCheck();
+  loadSmtp();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UI HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+function toggleSidebar() { document.body.classList.toggle('sidebar-collapsed'); }
+function toggleLight() {
+  document.body.classList.toggle('light-mode');
+  const on = document.body.classList.contains('light-mode');
+  localStorage.setItem('lightMode', on?'1':'0');
+  document.getElementById('light-btn').textContent = on ? '🌙 Dark' : '☀ Light';
+}
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.mode-btn').forEach((b,i) => b.classList.toggle('active', (i===0)===(m==='single')));
+  document.getElementById('mode-single').style.display  = m==='single'  ? 'flex' : 'none';
+  document.getElementById('mode-compare').style.display = m==='compare' ? 'flex' : 'none';
+  hide('results'); hide('compare-results'); hide('error-msg');
+}
+function setQuery(q) { document.getElementById('query').value = q; runAnalysis(); }
+function setCompare(a,b) { setMode('compare'); document.getElementById('query-a').value=a; document.getElementById('query-b').value=b; runCompare(); }
+function show(id) { document.getElementById(id).style.display = 'block'; }
+function hide(id) { document.getElementById(id).style.display = 'none'; }
+function showFlex(id) { document.getElementById(id).style.display = 'flex'; }
+function showErr(msg) { const e=document.getElementById('error-msg'); e.textContent='⚠ '+msg; e.style.display='block'; }
+function startLoad() { hide('error-msg'); hide('results'); hide('compare-results'); showFlex('loader'); }
+function stopLoad()  { hide('loader'); }
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab===name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id===`tab-${name}`));
+}
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function mkChart(id, type, data, opts) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id), {type, data, options: opts});
+  return charts[id];
+}
+const GRID_OPTS = { responsive:true, plugins:{ legend:{display:false} }, scales:{ x:{ticks:{color:'#666',font:{size:10}}, grid:{color:'rgba(128,128,128,.08)'}}, y:{ticks:{color:'#666'}, grid:{color:'rgba(128,128,128,.08)'}, beginAtZero:true} } };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SIDEBAR
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadSidebar() {
+  const [hRes, pRes] = await Promise.all([fetch('/history'), fetch('/pinned')]);
+  const { history } = await hRes.json();
+  const { pinned }  = await pRes.json();
+
+  const hEl = document.getElementById('sb-history');
+  hEl.innerHTML = history.length ? '' : '<div class="sb-empty">No searches yet</div>';
+  history.forEach(h => {
+    const d = document.createElement('div');
+    d.className = 'sb-item';
+    d.innerHTML = `<img src="${h.thumbnail_url||''}" onerror="this.style.display='none'"/>
+      <span class="sb-name">${h.channel_name||h.query}</span>
+      <span class="sb-del" onclick="event.stopPropagation();removeHistory()">✕</span>`;
+    d.onclick = () => { document.getElementById('query').value = h.query; runAnalysis(); };
+    hEl.appendChild(d);
+  });
+
+  const pEl = document.getElementById('sb-pinned');
+  pEl.innerHTML = pinned.length ? '' : '<div class="sb-empty">No pinned channels yet</div>';
+  pinned.forEach(p => {
+    const d = document.createElement('div');
+    d.className = 'sb-item';
+    d.innerHTML = `<img src="${p.thumbnail_url||''}" onerror="this.style.display='none'"/>
+      <span class="sb-name">${p.channel_name}</span>
+      <span class="sb-del" onclick="event.stopPropagation();unpinFromSidebar('${p.channel_id}')">✕</span>`;
+    d.onclick = () => { document.getElementById('query').value = p.query; runAnalysis(); };
+    pEl.appendChild(d);
+  });
+
+  // Update pin button if current channel is loaded
+  if (currentChannelId) updatePinBtn(currentChannelId);
+}
+
+async function clearHistory() {
+  await fetch('/history', {method:'DELETE'});
+  loadSidebar();
+}
+async function unpinFromSidebar(channelId) {
+  await fetch(`/pinned/${channelId}`, {method:'DELETE'});
+  loadSidebar();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PIN / ALERT
+// ─────────────────────────────────────────────────────────────────────────────
+async function updatePinBtn(channelId) {
+  const res = await fetch(`/pinned/${channelId}/status`);
+  const { pinned } = await res.json();
+  const btn = document.getElementById('pin-btn');
+  if (pinned) { btn.textContent='📌 Pinned'; btn.classList.add('pinned'); }
+  else        { btn.textContent='📌 Pin Channel'; btn.classList.remove('pinned'); }
+}
+
+async function togglePin() {
+  if (!currentData) return;
+  const {channel_id, name, thumbnail_url} = currentData;
+  const res = await fetch(`/pinned/${channel_id}/status`);
+  const { pinned } = await res.json();
+  if (pinned) {
+    await fetch(`/pinned/${channel_id}`, {method:'DELETE'});
+  } else {
+    const q = document.getElementById('query').value;
+    await fetch('/pinned', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({channel_id, channel_name: name, query: q, thumbnail_url})});
+  }
+  updatePinBtn(channel_id);
+  loadSidebar();
+}
+
+async function openAlertModal() {
+  if (!currentChannelId) return;
+  const res = await fetch(`/alerts/${currentChannelId}`);
+  const { config } = await res.json();
+  if (config) {
+    document.getElementById('alert-email').value  = config.email || '';
+    document.getElementById('alert-spike').value  = config.spike_threshold || 50;
+    document.getElementById('alert-drop').value   = config.drop_threshold  || 40;
+    document.getElementById('alert-freq').value   = config.check_frequency || 'daily';
+    document.getElementById('alert-enabled').classList.toggle('on', !!config.enabled);
+  } else {
+    document.getElementById('alert-email').value  = '';
+    document.getElementById('alert-spike').value  = 50;
+    document.getElementById('alert-drop').value   = 40;
+    document.getElementById('alert-freq').value   = 'daily';
+    document.getElementById('alert-enabled').classList.add('on');
+  }
+  document.getElementById('alert-status').className = 'modal-status';
+  openModal('modal-alert');
+}
+
+async function saveAlert() {
+  const st = document.getElementById('alert-status');
+  try {
+    await fetch(`/alerts/${currentChannelId}`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        email:           document.getElementById('alert-email').value,
+        spike_threshold: parseFloat(document.getElementById('alert-spike').value),
+        drop_threshold:  parseFloat(document.getElementById('alert-drop').value),
+        check_frequency: document.getElementById('alert-freq').value,
+        enabled:         document.getElementById('alert-enabled').classList.contains('on'),
+      })
+    });
+    st.className = 'modal-status ok'; st.textContent = '✓ Alert saved!';
+    setTimeout(() => closeModal('modal-alert'), 1200);
+  } catch(e) { st.className='modal-status err'; st.textContent='Error: '+e.message; }
+}
+
+async function deleteAlert() {
+  await fetch(`/alerts/${currentChannelId}`, {method:'DELETE'});
+  closeModal('modal-alert');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SMTP
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadSmtp() {
+  const res = await fetch('/settings/smtp');
+  const { smtp } = await res.json();
+  if (smtp && smtp.host) {
+    document.getElementById('smtp-host').value = smtp.host || '';
+    document.getElementById('smtp-port').value = smtp.port || 587;
+    document.getElementById('smtp-from').value = smtp.from_addr || '';
+    document.getElementById('smtp-user').value = smtp.username || '';
+    document.getElementById('smtp-pass').value = smtp.password || '';
+    document.getElementById('smtp-tls').classList.toggle('on', !!smtp.use_tls);
+  }
+}
+async function saveSmtp() {
+  const st = document.getElementById('smtp-status');
+  try {
+    await fetch('/settings/smtp', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        host:      document.getElementById('smtp-host').value,
+        port:      parseInt(document.getElementById('smtp-port').value),
+        from_addr: document.getElementById('smtp-from').value,
+        username:  document.getElementById('smtp-user').value,
+        password:  document.getElementById('smtp-pass').value,
+        use_tls:   document.getElementById('smtp-tls').classList.contains('on'),
+      })
+    });
+    st.className = 'modal-status ok'; st.textContent = '✓ Settings saved!';
+  } catch(e) { st.className='modal-status err'; st.textContent = 'Error: '+e.message; }
+}
+async function sendTestEmail() {
+  const to = document.getElementById('smtp-test-addr').value.trim();
+  const st = document.getElementById('smtp-status');
+  if (!to) { st.className='modal-status err'; st.textContent='Enter a test email address.'; return; }
+  st.className='modal-status'; st.textContent='Sending…'; st.style.display='block';
+  const res = await fetch('/alerts/test', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({to_email:to})});
+  const d = await res.json();
+  if (d.ok) { st.className='modal-status ok'; st.textContent='✓ Test email sent!'; }
+  else      { st.className='modal-status err'; st.textContent='Error: '+d.error; }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STARTUP CHECK
+// ─────────────────────────────────────────────────────────────────────────────
+async function startupCheck() {
+  try {
+    const res = await fetch('/startup-check');
+    const { alerts } = await res.json();
+    if (alerts && alerts.length > 0) {
+      const banner = document.getElementById('alert-banner');
+      const text   = document.getElementById('alert-banner-text');
+      const items  = alerts.map(a =>
+        `<b>${a.channel_name}</b>: ${a.metric} ${a.type} <b>${a.pct_change>0?'+':''}${a.pct_change}%</b>`
+      ).join(' &nbsp;·&nbsp; ');
+      text.innerHTML = `⚠️ Alerts detected — ${items}`;
+      banner.style.display = 'block';
+    }
+  } catch(e) {}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ANALYZE
+// ─────────────────────────────────────────────────────────────────────────────
+async function runAnalysis() {
+  const query = document.getElementById('query').value.trim();
+  if (!query) return;
+  startLoad();
+  try {
+    const res  = await fetch('/analyze', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query})});
+    const data = await res.json();
+    stopLoad();
+    if (!res.ok) { showErr(data.error || 'Something went wrong.'); return; }
+    currentData      = data;
+    currentChannelId = data.channel_id;
+    populateSingle(data);
+    loadSidebar();
+  } catch(e) { stopLoad(); showErr('Network error: '+e.message); }
+}
+
+function populateSingle(d) {
+  // Header
+  const av = document.getElementById('ch-avatar');
+  av.src = d.thumbnail_url || '';
+  av.style.display = d.thumbnail_url ? 'block' : 'none';
+  document.getElementById('ch-name').textContent    = d.name;
+  document.getElementById('ch-created').textContent = d.created_at;
+  document.getElementById('ch-country').textContent = d.country;
+  document.getElementById('ch-desc').textContent    = d.description;
+  updatePinBtn(d.channel_id);
+
+  // Stats
+  document.getElementById('s-subs').textContent     = d.subscribers;
+  document.getElementById('s-views').textContent    = d.total_views;
+  document.getElementById('s-vcount').textContent   = d.video_count;
+  document.getElementById('s-avg').textContent      = d.avg_views;
+  document.getElementById('s-eng').textContent      = d.eng_rate;
+  document.getElementById('s-freq').textContent     = d.upload_freq;
+  document.getElementById('s-alikes').textContent   = d.avg_likes;
+  document.getElementById('s-acomments').textContent= d.avg_comments;
+  document.getElementById('fetched-note').textContent = `Analysis based on ${d.fetched_count} most recent videos.`;
+
+  // Overview charts
+  buildMonthlyChart('chart-monthly', [d.name], [d.monthly_labels.slice().reverse()], [d.monthly_data.slice().reverse()], ['rgba(255,0,0,.65)']);
+  buildDistChart('chart-dist', d.views_dist_labels, d.views_dist_data);
+
+  // Top 10 videos
+  buildVideoGrid(document.getElementById('video-grid'), d.top_videos, 10, 'red');
+
+  // Analytics tab
+  if (d.extended) {
+    buildAnalyticsCharts(d);
+    buildViralGrid(d.extended.viral_videos || []);
+  }
+
+  // All videos table
+  buildAllVideosTable(d.all_videos || []);
+
+  // Export tab wiring
+  document.getElementById('vid-count-label').textContent = `(${(d.all_videos||[]).length} videos)`;
+
+  show('results');
+  switchTab('overview');
+  document.getElementById('results').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPARE
+// ─────────────────────────────────────────────────────────────────────────────
+async function runCompare() {
+  const q1 = document.getElementById('query-a').value.trim();
+  const q2 = document.getElementById('query-b').value.trim();
+  if (!q1||!q2) { showErr('Please enter both channels.'); return; }
+  startLoad();
+  try {
+    const res  = await fetch('/compare', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query1:q1, query2:q2})});
+    const data = await res.json();
+    stopLoad();
+    if (!res.ok) { showErr(data.error||'Something went wrong.'); return; }
+    populateCompare(data.a, data.b);
+    loadSidebar();
+  } catch(e) { stopLoad(); showErr('Network error: '+e.message); }
+}
+
+function populateCompare(a, b) {
+  document.getElementById('cmp-name-a').textContent = a.name;
+  document.getElementById('cmp-name-b').textContent = b.name;
+  document.getElementById('cmp-meta-a').textContent = `📅 ${a.created_at}  🌍 ${a.country}`;
+  document.getElementById('cmp-meta-b').textContent = `📅 ${b.created_at}  🌍 ${b.country}`;
+  document.getElementById('cmp-vid-label-a').textContent = a.name;
+  document.getElementById('cmp-vid-label-b').textContent = b.name;
+  document.getElementById('cmp-fetched-note').textContent =
+    `${a.name}: ${a.fetched_count} videos · ${b.name}: ${b.fetched_count} videos analyzed.`;
+
+  const metrics = [
+    {label:'Subscribers',        ka:'subscribers_raw',  higher:true},
+    {label:'Total Views',        ka:'total_views_raw',  higher:true},
+    {label:'Videos Published',   ka:'video_count_raw',  higher:false},
+    {label:'Avg Views / Video',  ka:'avg_views_raw',    higher:true},
+    {label:'Avg Likes / Video',  ka:'avg_likes_raw',    higher:true},
+    {label:'Avg Comments/Video', ka:'avg_comments_raw', higher:true},
+    {label:'Engagement Rate',    ka:'eng_rate_raw',     higher:true},
+    {label:'Upload Consistency', ka:'upload_consistency',higher:false},
+  ];
+  const valKeys = {
+    subscribers_raw:'subscribers', total_views_raw:'total_views',
+    video_count_raw:'video_count', avg_views_raw:'avg_views',
+    avg_likes_raw:'avg_likes', avg_comments_raw:'avg_comments',
+    eng_rate_raw:'eng_rate', upload_consistency:'upload_consistency',
+  };
+
+  const rows = document.getElementById('cmp-stats-rows');
+  rows.innerHTML='';
+  let sA=0, sB=0; const pA=[], pB=[];
+  metrics.forEach(m => {
+    const ra=a[m.ka]||0, rb=b[m.ka]||0;
+    let wa=false, wb=false;
+    if(ra!==rb){ wa=m.higher?ra>rb:ra<rb; wb=!wa; if(wa){sA++;pA.push(m.label);}else{sB++;pB.push(m.label);} }
+    const va = valKeys[m.ka]; const vb = valKeys[m.ka];
+    const row=document.createElement('div'); row.className='cmp-row';
+    row.innerHTML=`<div class="cmp-val a ${wa?'wa':''}">${a[va]??'N/A'}</div>
+      <div class="cmp-label">${m.label}</div>
+      <div class="cmp-val b ${wb?'wb':''}">${b[vb]??'N/A'}</div>`;
+    rows.appendChild(row);
+  });
+
+  // Winner
+  const winner=sA>=sB?a:b, loser=sA>=sB?b:a, cls=sA>=sB?'a':'b';
+  document.getElementById('cmp-winner-title').textContent=sA===sB?"It's a tie!":`${winner.name} wins`;
+  document.getElementById('cmp-winner-sub').textContent=sA===sB?'Both channels are evenly matched.'
+    :`Leads in ${Math.max(sA,sB)} of ${metrics.length} categories over ${loser.name}.`;
+  const pillsEl=document.getElementById('cmp-winner-pills'); pillsEl.innerHTML='';
+  pA.forEach(p=>{const s=document.createElement('span');s.className='wpill a';s.textContent=p;pillsEl.appendChild(s);});
+  pB.forEach(p=>{const s=document.createElement('span');s.className='wpill b';s.textContent=p;pillsEl.appendChild(s);});
+
+  // Monthly chart
+  const allLabels=[...new Set([...a.monthly_labels,...b.monthly_labels])].sort().reverse().slice(0,12).reverse();
+  const mA=Object.fromEntries(a.monthly_labels.map((l,i)=>[l,a.monthly_data[i]]));
+  const mB=Object.fromEntries(b.monthly_labels.map((l,i)=>[l,b.monthly_data[i]]));
+  buildMonthlyChart('cmp-chart-monthly', [a.name, b.name],
+    [allLabels, allLabels],
+    [allLabels.map(l=>mA[l]||0), allLabels.map(l=>mB[l]||0)],
+    ['rgba(255,0,0,.6)','rgba(68,136,255,.6)']);
+
+  // Radar
+  buildRadarChart(a,b);
+
+  buildVideoGrid(document.getElementById('cmp-vid-grid-a'), a.top_videos, 5, 'red');
+  buildVideoGrid(document.getElementById('cmp-vid-grid-b'), b.top_videos, 5, 'blue');
+
+  show('compare-results');
+  document.getElementById('compare-results').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CHARTS
+// ─────────────────────────────────────────────────────────────────────────────
+function buildMonthlyChart(canvasId, names, labelsArr, datasetsArr, colors) {
+  const labels = labelsArr[0];
+  const datasets = datasetsArr.map((data,i)=>({
+    label: names[i], data,
+    backgroundColor: colors[i]||'rgba(255,0,0,.6)',
+    borderColor: colors[i]?.replace('.6','.9')||'rgba(255,0,0,.9)',
+    borderWidth:1, borderRadius:4,
+  }));
+  mkChart(canvasId, 'bar', {labels, datasets}, {
+    responsive:true, plugins:{legend:{display:names.length>1, labels:{color:'#888',font:{size:11}}}},
+    scales:{ x:{ticks:{color:'#666',font:{size:10}},grid:{color:'rgba(128,128,128,.06)'}},
+             y:{ticks:{color:'#666',stepSize:1},grid:{color:'rgba(128,128,128,.06)'},beginAtZero:true}}
+  });
+}
+
+function buildDistChart(canvasId, labels, data) {
+  const nzL=[], nzD=[];
+  labels.forEach((l,i)=>{ if(data[i]>0){nzL.push(l);nzD.push(data[i]);} });
+  mkChart(canvasId, 'doughnut', {
+    labels:nzL, datasets:[{data:nzD,
+      backgroundColor:['#ff0000','#ff3333','#ff5555','#ff8888','#ffaaaa','#cc2222','#991111'],
+      borderColor:'rgba(0,0,0,.2)', borderWidth:2, hoverOffset:5}]
+  }, {responsive:true, cutout:'60%', plugins:{
+    legend:{position:'right',labels:{color:'#888',font:{size:11},padding:10,boxWidth:11}},
+    tooltip:{callbacks:{label:c=>` ${c.label}: ${c.parsed} videos`}}}});
+}
+
+function buildAnalyticsCharts(d) {
+  const ext = d.extended;
+  // Day-of-week
+  const dayNames=Object.keys(ext.day_stats||{});
+  const dayVals=Object.values(ext.day_stats||{}).map(v=>Math.round(v/1000));
+  mkChart('chart-day','bar',{labels:dayNames,datasets:[{label:'Avg Views (K)',data:dayVals,
+    backgroundColor:dayVals.map(v=>v===Math.max(...dayVals)?'rgba(34,197,94,.7)':'rgba(34,197,94,.3)'),
+    borderColor:'rgba(34,197,94,.9)',borderWidth:1,borderRadius:4}]},{
+    responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${(c.parsed.y*1000).toLocaleString()} avg views`}}},
+    scales:{x:{ticks:{color:'#666',font:{size:10}},grid:{color:'rgba(128,128,128,.06)'}},
+            y:{ticks:{color:'#666'},grid:{color:'rgba(128,128,128,.06)'},beginAtZero:true}}});
+
+  // Views over time
+  const vot=ext.views_over_time||[];
+  mkChart('chart-time','line',{
+    labels:vot.map(v=>v.date),
+    datasets:[{label:'Views',data:vot.map(v=>v.views),
+      borderColor:'rgba(34,197,94,.9)',backgroundColor:'rgba(34,197,94,.07)',
+      pointRadius:2,tension:.3,fill:true}]},{
+    responsive:true,plugins:{legend:{display:false}},
+    scales:{x:{ticks:{color:'#666',font:{size:9},maxTicksLimit:10,maxRotation:0},grid:{color:'rgba(128,128,128,.06)'}},
+            y:{ticks:{color:'#666',callback:v=>fmtK(v)},grid:{color:'rgba(128,128,128,.06)'},beginAtZero:true}}});
+
+  // Video length
+  const lb=ext.length_buckets||{}; const lk=Object.keys(lb); const lv=lk.map(k=>lb[k].avg_views/1000);
+  mkChart('chart-length','bar',{labels:lk,datasets:[{label:'Avg Views (K)',data:lv,
+    backgroundColor:lv.map(v=>v===Math.max(...lv)?'rgba(255,165,0,.7)':'rgba(255,165,0,.3)'),
+    borderColor:'rgba(255,165,0,.9)',borderWidth:1,borderRadius:4}]},{
+    responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${(c.parsed.y*1000).toLocaleString()} avg views`}}},
+    scales:{x:{ticks:{color:'#666',font:{size:10}},grid:{color:'rgba(128,128,128,.06)'}},
+            y:{ticks:{color:'#666'},grid:{color:'rgba(128,128,128,.06)'},beginAtZero:true}}});
+
+  // Shorts vs Long-form doughnut
+  mkChart('chart-shorts','doughnut',{
+    labels:[`Shorts (${ext.shorts_count})`,`Long-form (${ext.long_count})`],
+    datasets:[{data:[ext.shorts_count,ext.long_count],
+      backgroundColor:['rgba(255,165,0,.7)','rgba(99,102,241,.7)'],
+      borderColor:'rgba(0,0,0,.15)',borderWidth:2,hoverOffset:4}]},{
+    responsive:true,cutout:'55%',plugins:{legend:{position:'bottom',labels:{color:'#888',font:{size:11},padding:10}}}});
+
+  // Keywords
+  const kws=ext.keywords||[];
+  mkChart('chart-keywords','bar',{
+    labels:kws.map(k=>k.word),
+    datasets:[{label:'Avg Views',data:kws.map(k=>k.avg_views/1000),
+      backgroundColor:'rgba(139,92,246,.5)',borderColor:'rgba(139,92,246,.9)',borderWidth:1,borderRadius:3}]},{
+    responsive:true,indexAxis:'y',
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${(c.parsed.x*1000).toLocaleString()} avg views`}}},
+    scales:{x:{ticks:{color:'#666',callback:v=>fmtK(v*1000)},grid:{color:'rgba(128,128,128,.06)'},beginAtZero:true},
+            y:{ticks:{color:'#888',font:{size:10}},grid:{color:'rgba(128,128,128,.04)'}}}});
+}
+
+function buildRadarChart(a, b) {
+  const norm=(v,max)=>max?Math.round(v/max*100):0;
+  const mS=Math.max(a.subscribers_raw,b.subscribers_raw);
+  const mV=Math.max(a.avg_views_raw,b.avg_views_raw);
+  const mL=Math.max(a.avg_likes_raw,b.avg_likes_raw);
+  const mC=Math.max(a.avg_comments_raw,b.avg_comments_raw);
+  const mE=Math.max(a.eng_rate_raw,b.eng_rate_raw);
+  mkChart('cmp-chart-radar','radar',{
+    labels:['Subscribers','Avg Views','Avg Likes','Comments','Engagement'],
+    datasets:[
+      {label:a.name,data:[norm(a.subscribers_raw,mS),norm(a.avg_views_raw,mV),norm(a.avg_likes_raw,mL),norm(a.avg_comments_raw,mC),norm(a.eng_rate_raw,mE)],
+       borderColor:'rgba(255,0,0,.9)',backgroundColor:'rgba(255,0,0,.1)',pointBackgroundColor:'#ff0000',borderWidth:2},
+      {label:b.name,data:[norm(b.subscribers_raw,mS),norm(b.avg_views_raw,mV),norm(b.avg_likes_raw,mL),norm(b.avg_comments_raw,mC),norm(b.eng_rate_raw,mE)],
+       borderColor:'rgba(68,136,255,.9)',backgroundColor:'rgba(68,136,255,.1)',pointBackgroundColor:'#4488ff',borderWidth:2},
+    ]},{responsive:true,plugins:{legend:{labels:{color:'#888',font:{size:11}}}},
+    scales:{r:{angleLines:{color:'rgba(255,255,255,.07)'},grid:{color:'rgba(255,255,255,.07)'},
+              ticks:{display:false},pointLabels:{color:'#888',font:{size:10}},
+              suggestedMin:0,suggestedMax:100}}});
+}
+
+function fmtK(n) { if(n>=1e9)return(n/1e9).toFixed(1)+'B'; if(n>=1e6)return(n/1e6).toFixed(1)+'M'; if(n>=1e3)return(n/1e3).toFixed(0)+'K'; return n; }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VIDEO GRIDS
+// ─────────────────────────────────────────────────────────────────────────────
+function buildVideoGrid(el, videos, limit, color) {
+  el.innerHTML='';
+  videos.slice(0,limit).forEach((v,i)=>{
+    const scoreStr = v.viral_score>=3 ? `<span class="viral-badge">${v.viral_score}×</span>` : '';
+    const accentColor = color==='blue' ? 'var(--blue)' : 'var(--red)';
+    const card=document.createElement('a');
+    card.className='video-card'; card.href=v.url; card.target='_blank'; card.rel='noopener';
+    card.innerHTML=`<div class="video-thumb">
+      <img src="${v.thumbnail}" alt="" loading="lazy"/>
+      <span class="v-rank" style="background:${accentColor}">#${i+1}</span>
+      <span class="v-dur">${v.duration}</span>
+    </div>
+    <div class="video-info">
+      <div class="video-title">${v.title}</div>
+      <div class="video-date">${v.published}</div>
+      <div class="video-stats">
+        <div class="si hl"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>${v.views}</div>
+        <div class="si"><svg viewBox="0 0 24 24"><path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg>${v.likes}</div>
+        ${scoreStr}
+      </div>
+    </div>`;
+    el.appendChild(card);
+  });
+}
+
+function buildViralGrid(viral) {
+  const grid=document.getElementById('viral-grid');
+  const none=document.getElementById('no-viral');
+  if (!viral.length) { grid.style.display='none'; none.style.display='block'; return; }
+  grid.style.display=''; none.style.display='none';
+  grid.innerHTML='';
+  viral.forEach((v,i)=>{
+    const card=document.createElement('a');
+    card.className='video-card'; card.href=v.url; card.target='_blank'; card.rel='noopener';
+    card.innerHTML=`<div class="video-thumb">
+      <img src="${v.thumbnail}" alt="" loading="lazy"/>
+      <span class="v-rank">#${i+1}</span>
+      <span class="v-dur">${v.duration}</span>
+    </div>
+    <div class="video-info">
+      <div class="video-title">${v.title}</div>
+      <div class="video-date">${v.published}</div>
+      <div class="video-stats">
+        <div class="si hl"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>${v.views_fmt}</div>
+        <span class="viral-badge">${v.viral_score}× viral</span>
+      </div>
+    </div>`;
+    grid.appendChild(card);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ALL VIDEOS TABLE
+// ─────────────────────────────────────────────────────────────────────────────
+function buildAllVideosTable(videos) {
+  const tbody = document.getElementById('all-vids-body');
+  tbody.innerHTML='';
+  const sorted = sortVideos(videos, sortCol, sortAsc);
+  sorted.forEach((v,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${i+1}</td>
+      <td><a href="${v.url}" target="_blank" rel="noopener">${v.title.slice(0,60)}</a></td>
+      <td>${v.published}</td>
+      <td class="num red">${v.views}</td>
+      <td class="num">${v.likes}</td>
+      <td class="num">${v.comments}</td>
+      <td>${v.duration}</td>
+      <td class="num">${v.viral_score>=3?`<span class="viral-badge">${v.viral_score}×</span>`:v.viral_score}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+function sortVideos(videos, col, asc) {
+  return [...videos].sort((a,b)=>{
+    let va=a[col]??0, vb=b[col]??0;
+    if(typeof va==='string') va=va.toLowerCase(), vb=vb.toLowerCase();
+    return asc ? (va>vb?1:-1) : (va<vb?1:-1);
+  });
+}
+function sortTable(col) {
+  if(sortCol===col) sortAsc=!sortAsc; else { sortCol=col; sortAsc=false; }
+  document.querySelectorAll('.sort-arrow').forEach(s=>{
+    s.classList.toggle('active', s.dataset.col===col);
+    if(s.dataset.col===col) s.textContent=sortAsc?'↑':'↓';
+    else s.textContent='↕';
+  });
+  if(currentData) buildAllVideosTable(currentData.all_videos||[]);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPORT
+// ─────────────────────────────────────────────────────────────────────────────
+async function downloadCSV() {
+  if(!currentData) return;
+  const res = await fetch('/export/csv', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({channel_name: currentData.name, videos: currentData.all_videos||[]})
+  });
+  const blob = await res.blob();
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`${currentData.name}_videos.csv`; a.click();
+}
+
+async function printReport() {
+  if(!currentData) return;
+  const res = await fetch('/report', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(currentData)
+  });
+  const html = await res.text();
+  const w=window.open('','_blank');
+  w.document.write(html); w.document.close();
+}
+</script>
+</body>
+</html>
